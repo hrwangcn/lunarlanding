@@ -1,0 +1,738 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登月模拟器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="header">
+        <h1>登月模拟器</h1>
+        <div style="font-size: 12px; color: #777">按空格键启动发动机 | A/D键左右旋转 | 触屏使用控制按钮</div>
+    </div>
+
+    <div class="main-container">
+        <div class="game-canvas-container">
+            <canvas id="gameCanvas"></canvas>
+            <div class="moon-indicator" id="moonIndicator">
+                <div class="moon-arrow"></div>
+                <div class="moon-distance" id="moonDistance">高度: 10000 米</div>
+            </div>
+            <div class="result-panel" id="resultPanel">
+                <h2 id="resultTitle">任务结果</h2>
+                <p id="resultMessage"></p>
+                <button onclick="restartGame()">开始新任务</button>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div>
+                <div class="digital-display">
+                    <div class="data-row">
+                        <span class="label">高度:</span>
+                        <span class="value" id="altitude">10000 米</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">水平速度:</span>
+                        <span class="value" id="hSpeed">800 m/s</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">垂直速度:</span>
+                        <span class="value" id="vSpeed">0 m/s</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">水平距离:</span>
+                        <span class="value" id="hDistance">0 米</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">燃料:</span>
+                        <span class="value" id="fuel">5000 kg</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">质量:</span>
+                        <span class="value" id="mass">12000 kg</span>
+                    </div>
+                </div>
+
+                <div class="instrument-row">
+                    <div class="instrument">
+                        <div class="instrument-title">燃料水平</div>
+                        <div class="gauge">
+                            <div class="gauge-fill" id="fuelGauge"></div>
+                            <div class="gauge-markers">
+                                <div class="marker" style="left:0"></div>
+                                <div class="marker" style="left:25%"></div>
+                                <div class="marker" style="left:50%"></div>
+                                <div class="marker" style="left:75%"></div>
+                                <div class="marker" style="left:100%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="instrument">
+                        <div class="instrument-title">推力</div>
+                        <div class="gauge">
+                            <div class="gauge-fill" id="thrustGauge"></div>
+                            <div class="gauge-markers">
+                                <div class="marker" style="left:0"></div>
+                                <div class="marker" style="left:100%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="compass">
+                    <div class="compass-inner">
+                        <div class="compass-needle" id="compassNeedle"></div>
+                        <div class="compass-label compass-n">+90</div>
+                        <div class="compass-label compass-s">-90</div>
+                        <div class="compass-label compass-w">180</div>
+                        <div class="compass-label compass-e">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="control-buttons">
+                    <button class="control-btn" id="leftBtn">左转 (A)</button>
+                    <button class="control-btn engine-btn" id="engineBtn">发动机点火 (空格)</button>
+                    <button class="control-btn" id="rightBtn">右转 (D)</button>
+                </div>
+
+                <div class="status-panel">
+                    状态: <span id="engineStatus">发动机关闭</span> |
+                    姿态: <span id="landerAngle">270°</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 游戏常量
+        const MOON_GRAVITY_CONSTANT = 1.62; // 月球重力加速度 (m/s²)
+        let MOON_GRAVITY = 0;
+        const START_THRUST = 44000;      // 发动机推力 (N)
+        let THRUST = 0;
+        const START_FUEL_RATE = 15;     // 燃料消耗率 (kg/s)
+        let FUEL_RATE = 0;
+        const DRY_MASS = 7000;    // 干质量 (kg)
+        const INITIAL_FUEL = 4000; // 初始燃料 (kg)
+        const MOON_RADIUS = 1737000; // 月球半径 (m)
+        const MOON_VISIBLE_HEIGHT = 5000; // 月球表面可见高度
+        const HORIZONTAL_SCALE = 0.001; // 水平移动比例系数
+        
+        const TARGET_START = 80000;    // 目标起始位置 (80km)
+        const TARGET_END = 120000;     // 目标结束位置 (120km)
+        const TARGET_CENTER = 100000;  // 目标中心位置 (100km)
+        const START_HORIZONTAL_SPEED = 800; // 启动时水平速度
+        // 获取随机山峰高度 (1000-5000米)
+        function getRandomMountainHeight() {
+            return 1000 + Math.random() * 8000; // 1000-5000米
+        }
+        // 获取随机山峰宽度 (100-500米)
+        function getRandomMountainWidth() {
+            return 100 + Math.random() * 4000; // 100-500米
+        }
+
+        // 画布尺寸
+        let canvasWidth = 800;
+        let canvasHeight = 500;
+
+        // 游戏状态
+        let gameRunning = true;
+        let engineOn = false;
+        let landerAngle = Math.PI + Math.PI / 2; // 初始270度（尾部朝前）
+        let altitude = 5000;      // 初始高度 (m)
+        let horizontalSpeed = 0; // 初始水平速度 (m/s) 向右
+        let verticalSpeed = 0;     // 初始垂直速度 (m/s)
+        let fuel = INITIAL_FUEL;   // 当前燃料 (kg)
+        let mass = DRY_MASS + fuel; // 当前质量 (kg)
+        let landerX = 0;           // 着陆器位置（居中）
+        let landerY = 0;           // 着陆器y位置
+        let lastTime = 0;          // 用于计算时间差
+        let terrainOffset = 0;     // 地形水平偏移
+        let moonSurfaceCurrentHeight = 0; // 月球表面显示高度
+        let horizontalDistance = 0; // 新添加的水平距离变量
+        let distanceToTarget = TARGET_CENTER; // 初始距离目标100km
+        // 地形数据
+        let terrain = [];
+        const TERRAIN_SEGMENTS = 100;
+        //添加一座山
+        let mountain = {
+            x: 0,
+            baseWidth: 200,
+            height: 0,
+            peakX: 0
+        };
+        // 星空背景
+        let stars = [];
+        const STAR_COUNT = 200;
+
+        // DOM元素
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const engineBtn = document.getElementById('engineBtn');
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const engineStatus = document.getElementById('engineStatus');
+        const landerAngleDisplay = document.getElementById('landerAngle');
+        const resultPanel = document.getElementById('resultPanel');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        const fuelGauge = document.getElementById('fuelGauge');
+        const thrustGauge = document.getElementById('thrustGauge');
+        const compassNeedle = document.getElementById('compassNeedle');
+        const moonIndicator = document.getElementById('moonIndicator');
+        const moonDistance = document.getElementById('moonDistance');
+
+        // 初始化画布
+        function initCanvas() {
+            const container = document.querySelector('.game-canvas-container');
+            canvasWidth = container.clientWidth;
+            canvasHeight = container.clientHeight;
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+
+            landerX = canvasWidth / 2;
+
+            const targetIndicator = document.createElement('div');
+            targetIndicator.className = 'target-indicator';
+            targetIndicator.innerHTML = `
+                <div class="target-arrow"></div>
+                <div class="target-distance" id="targetDistance"> </div>
+            `;
+            document.querySelector('.game-canvas-container').appendChild(targetIndicator);
+
+            // 创建星空背景
+            stars = [];
+            for (let i = 0; i < STAR_COUNT; i++) {
+                stars.push({
+                    x: Math.random() * canvasWidth,
+                    y: Math.random() * canvasHeight,
+                    size: Math.random() * 1.5,
+                    brightness: 0.2 + Math.random() * 0.5,
+                    speed: 0.01 + Math.random() * 0.02
+                });
+            }
+
+            // 生成地形
+            generateTerrain();
+
+            // 初始化山峰（随机高度和宽度）
+            mountain = {
+                x: canvasWidth + 500, // 初始位置在屏幕右侧外
+                baseWidth: getRandomMountainWidth(),
+                height: getRandomMountainHeight(),
+                peakX: 0
+            };
+            // 更新月球表面显示
+            updateMoonSurface();
+        }
+
+        // 生成地形
+        function generateTerrain() {
+            terrain = [];
+            const maxHeight = canvasHeight * 0.9;
+            const minHeight = canvasHeight * 0.85;
+            let height = minHeight + Math.random() * (maxHeight - minHeight);
+
+            // 创建平缓着陆区域
+            const targetX = canvasWidth / 2;
+
+            for (let i = 0; i <= TERRAIN_SEGMENTS; i++) {
+                const x = i * (canvasWidth / TERRAIN_SEGMENTS);
+
+                // 在目标着陆区域创建平坦地带
+                if (Math.abs(x - targetX) < 100) {
+                    height = minHeight;
+                } else {
+                    // 缓坡过渡
+                    const distance = Math.abs(x - targetX) - 100;
+                    if (distance < 200) {
+                        height = minHeight + (distance / 200) * (maxHeight - minHeight);
+                    } else {
+                        // 随机地形变化
+                        height += (Math.random() - 0.5) * 5;
+                        height = Math.min(maxHeight, Math.max(minHeight, height));
+                    }
+                }
+
+                terrain.push({
+                    x: x,
+                    y: height
+                });
+            }
+        }
+
+        // 更新月球表面显示
+        function updateMoonSurface() {
+            // 更新月球指示器
+            moonDistance.textContent = `高度: ${Math.round(altitude)} 米`;
+
+            // 在5000米以下隐藏指示器
+            if (altitude < MOON_VISIBLE_HEIGHT) {
+                moonIndicator.style.display = 'none';
+            } else {
+                moonIndicator.style.display = 'flex';
+            }
+        }
+
+        // 绘制星空
+        function drawStars() {
+            for (let star of stars) {
+                // 非常缓慢地移动星星
+                star.x -= star.speed;
+                if (star.x < 0) star.x = canvasWidth;
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // 绘制月球表面（带水平移动）
+        function drawMoonSurface() {
+            const TARGET_VISUAL_SCALE = 0.04; // 目标区视觉比例
+            if (altitude > MOON_VISIBLE_HEIGHT) return;
+
+            // 计算月球表面高度
+            const surfaceHeight = Math.max(0, (1 - altitude / MOON_VISIBLE_HEIGHT) * canvasHeight * 0.3);
+            const surfaceY = canvasHeight - surfaceHeight;
+
+            // 更新地形偏移
+            terrainOffset -= horizontalSpeed * HORIZONTAL_SCALE;
+
+            // 绘制月球表面
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, surfaceY, canvasWidth, surfaceHeight);
+
+            // 计算大山在画布上的高度 (3000米对应月球可见高度5000米的比例)
+            const MOUNTAIN_VISUAL_SCALE = TARGET_VISUAL_SCALE;
+            const mountainHeight = (mountain.height / MOON_VISIBLE_HEIGHT) * (canvasHeight * 0.3);
+            const mountainPixelWidth = mountain.baseWidth * MOUNTAIN_VISUAL_SCALE;
+            // 更新大山位置（随着地形移动）
+            mountain.x -= horizontalSpeed * MOUNTAIN_VISUAL_SCALE * 0.02;
+
+            // 如果大山移出屏幕左侧，重置到右侧
+            if (mountain.x < -mountain.baseWidth) {
+                mountain.x = canvasWidth + 20;
+                mountain.baseWidth = getRandomMountainWidth();
+                mountain.height = getRandomMountainHeight();
+            }
+
+            // 绘制大山
+            if (mountain.x > -mountain.baseWidth && mountain.x < canvasWidth + mountain.baseWidth) {
+                ctx.fillStyle = '#444';
+                ctx.beginPath();
+                ctx.moveTo(mountain.x, surfaceY);
+                ctx.lineTo(mountain.x + mountain.baseWidth / 2, surfaceY - mountainHeight);
+                ctx.lineTo(mountain.x + mountain.baseWidth, surfaceY);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 绘制地形特征（带水平偏移）
+            for (let i = 0; i < terrain.length; i++) {
+                // 应用水平偏移（使用双倍画布宽度实现循环）
+                const x = (terrain[i].x + terrainOffset * 2) % (canvasWidth * 2);
+
+            }
+
+            // 绘制着陆区域
+            const targetX = canvasWidth / 2;
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(targetX - 30, surfaceY - 3);
+            ctx.lineTo(targetX + 30, surfaceY - 3);
+            ctx.stroke();
+
+            // 绘制目标区域
+            const targetScreenStart = canvasWidth / 2 + (TARGET_START - horizontalDistance) * TARGET_VISUAL_SCALE;
+            const targetScreenEnd = canvasWidth / 2 + (TARGET_END - horizontalDistance) * TARGET_VISUAL_SCALE;
+            const targetScreenCenter = canvasWidth / 2 + (TARGET_CENTER - horizontalDistance) * TARGET_VISUAL_SCALE;
+            // 在目标区添加文字标签
+            ctx.fillStyle = '#0f0';
+            ctx.font = '12px Courier New';
+            ctx.fillText('目标区', targetScreenCenter - 30, surfaceY + 20);
+
+            // 绘制目标区域背景
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+            ctx.fillRect(targetScreenStart, surfaceY, targetScreenEnd - targetScreenStart, surfaceHeight);
+
+            // 绘制目标中心标记
+            ctx.fillStyle = '#0f0';
+            ctx.beginPath();
+            ctx.arc(targetScreenCenter, surfaceY + surfaceHeight / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 绘制目标边界
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(targetScreenStart, surfaceY);
+            ctx.lineTo(targetScreenStart, surfaceY + surfaceHeight);
+            ctx.moveTo(targetScreenEnd, surfaceY);
+            ctx.lineTo(targetScreenEnd, surfaceY + surfaceHeight);
+            ctx.stroke();
+
+            // 在drawMoonSurface函数末尾添加目标指示器更新
+            // 更新目标距离指示器
+            distanceToTarget = TARGET_CENTER - horizontalDistance;
+            const distanceText = distanceToTarget >= 0 ?
+                `目标: ${(distanceToTarget / 1000).toFixed(1)} km` :
+                `已过目标: ${Math.abs(distanceToTarget / 1000).toFixed(1)} km`;
+
+            document.getElementById('targetDistance').textContent = distanceText;
+
+            // 旋转箭头指示方向
+            const targetArrow = document.querySelector('.target-arrow');
+            if (distanceToTarget > 0) {
+                targetArrow.style.transform = 'rotate(0deg)';
+            } else {
+                targetArrow.style.transform = 'rotate(180deg)';
+            }
+
+
+        }
+
+        // 绘制着陆器
+        function drawLander() {
+            // 计算着陆器在画布上的位置
+            let landerCanvasY;
+
+            if (altitude > MOON_VISIBLE_HEIGHT) {
+                // 高于5000米，位置固定
+                landerCanvasY = canvasHeight * 0.3;
+            } else if (altitude > 0) {
+                // 在5000米以下，着陆器逐渐下降
+                const surfaceY = canvasHeight - moonSurfaceCurrentHeight;
+                const minY = surfaceY - 20; // 距离月球表面20像素
+                const maxY = canvasHeight * 0.3;
+                const t = altitude / MOON_VISIBLE_HEIGHT;
+                landerCanvasY = minY + (maxY - minY) * t;
+            } else {
+                // 高度为0，着陆器在月球表面
+                landerCanvasY = canvasHeight - moonSurfaceCurrentHeight - 10;
+            }
+
+            ctx.save();
+            ctx.translate(landerX, landerCanvasY);
+            ctx.rotate(landerAngle);
+
+            // 着陆器主体（三角形）
+            ctx.beginPath();
+            ctx.moveTo(0, -7.5); // 原来是-15
+            ctx.lineTo(-6, 6);   // 原来是-12,12
+            ctx.lineTo(6, 6);     // 原来是12,12
+            ctx.closePath();
+
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // 着陆腿
+            ctx.beginPath();
+            ctx.moveTo(-4.5, 6); // 原来是-9,12
+            ctx.lineTo(-9, 12);   // 原来是-18,24
+            ctx.moveTo(4.5, 6);
+            ctx.lineTo(9, 12);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // 发动机喷口
+            ctx.beginPath();
+            // 发动机喷口
+            ctx.arc(0, 6, 2.5, 0, Math.PI); // 半径原来是5
+            ctx.stroke();
+
+            // 发动机火焰
+            if (engineOn) {
+                const flameLength = 10 + Math.random() * 7.5;
+                const flameWidth = 4 + Math.random() * 3;
+
+                ctx.beginPath();
+                ctx.moveTo(-flameWidth / 2, 12);
+                ctx.lineTo(0, 12 + flameLength);
+                ctx.lineTo(flameWidth / 2, 12);
+                ctx.closePath();
+
+                // 火焰颜色
+                const gradient = ctx.createLinearGradient(0, 12, 0, 12 + flameLength);
+                gradient.addColorStop(0, '#ff0');
+                gradient.addColorStop(0.3, '#f80');
+                gradient.addColorStop(1, '#f00');
+
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // 更新物理状态
+        function updatePhysics(deltaTime) {
+            if (!gameRunning) return;
+
+            // 计算离心力效应
+            const centrifugalAcceleration = (horizontalSpeed * horizontalSpeed) / (MOON_RADIUS + altitude);
+
+            // 重力加速度（考虑离心力）
+            const gravityAcceleration = -MOON_GRAVITY + centrifugalAcceleration;
+
+            // 计算发动机推力加速度
+            let thrustAccelerationX = 0;
+            let thrustAccelerationY = 0;
+
+            if (engineOn && fuel > 0) {
+                // 计算推力方向（尾部方向）
+                const thrustDirection = landerAngle + Math.PI / 2 + Math.PI;
+
+                thrustAccelerationX = (THRUST * Math.cos(-thrustDirection)) / mass;
+                thrustAccelerationY = (THRUST * Math.sin(-thrustDirection)) / mass;
+
+                // 消耗燃料
+                const fuelUsed = FUEL_RATE * deltaTime;
+                fuel = Math.max(0, fuel - fuelUsed);
+                mass = DRY_MASS + fuel;
+            }
+
+            // 更新速度
+            verticalSpeed += (gravityAcceleration + thrustAccelerationY) * deltaTime;
+            horizontalSpeed += thrustAccelerationX * deltaTime;
+
+            // 更新位置
+            altitude += verticalSpeed * deltaTime;
+
+            // 更新水平距离（基于速度和时间）
+            horizontalDistance += horizontalSpeed * deltaTime;
+
+            // 确保高度不低于0
+            altitude = Math.max(0, altitude);
+
+            // 更新月球表面显示高度
+            moonSurfaceCurrentHeight = Math.max(0, (1 - altitude / MOON_VISIBLE_HEIGHT) * canvasHeight * 0.3);
+
+            // 更新月球表面显示
+            updateMoonSurface();
+
+            // 检查是否着陆
+            if (altitude <= 0) {
+                checkLanding();
+            }
+
+            // 更新UI显示
+            updateUI();
+        }
+
+        // 更新UI显示
+        function updateUI() {
+            // 更新数字显示
+            document.getElementById('altitude').textContent = Math.round(altitude) + ' 米';
+            document.getElementById('hSpeed').textContent = Math.round(horizontalSpeed) + ' m/s';
+            document.getElementById('vSpeed').textContent = Math.round(verticalSpeed) + ' m/s';
+            document.getElementById('fuel').textContent = Math.round(fuel) + ' kg';
+            document.getElementById('mass').textContent = Math.round(mass) + ' kg';
+            document.getElementById('hDistance').textContent = Math.round(horizontalDistance) + ' 米';
+            // 更新仪表盘
+            fuelGauge.style.width = (fuel / INITIAL_FUEL * 100) + '%';
+            thrustGauge.style.width = (engineOn ? 100 : 0) + '%';
+
+            // 更新状态信息
+            const angleDeg = Math.round(landerAngle * 180 / Math.PI);
+            landerAngleDisplay.textContent = angleDeg + '°';
+            engineStatus.textContent = engineOn ? '发动机点火中' : '发动机关闭';
+
+            // 更新指南针
+            const compassAngle = (angleDeg + 90) % 360;
+            compassNeedle.style.transform = `translate(-50%, -50%) rotate(${compassAngle}deg)`;
+        }
+
+        // 检查着陆结果
+        function checkLanding() {
+            gameRunning = false;
+
+            const absHSpeed = Math.abs(horizontalSpeed);
+            const absVSpeed = Math.abs(verticalSpeed);
+
+            resultPanel.style.display = 'block';
+
+            // 计算落点评分
+            const distanceToCenter = Math.abs(horizontalDistance - TARGET_CENTER);
+            let score = 100 - Math.max(0, (distanceToCenter - 1000) / 1000 * 2);
+            score = Math.max(0, Math.min(100, score)); // 确保分数在0-100之间
+
+            let resultText = "";
+
+            if (absHSpeed < 3 && absVSpeed < 3) {
+                resultTitle.textContent = "成功着陆!";
+                resultTitle.style.color = "#0f0";
+                resultText = "完美着陆！";
+            } else if (absHSpeed < 7 && absVSpeed < 7) {
+                resultTitle.textContent = "下降率太大！";
+                resultTitle.style.color = "#ff0";
+                resultText = "成功99%";
+            } else {
+                resultTitle.textContent = "完啦！";
+                resultTitle.style.color = "#f00";
+                resultText = "着陆器坠毁！";
+            }
+
+            // 添加评分信息
+            resultMessage.innerHTML = `
+                ${resultText}<br>
+                落点评分: ${score.toFixed(1)}分<br>
+                偏离目标中心: ${(distanceToCenter / 1000).toFixed(1)} km<br>
+                垂直速度: ${absVSpeed.toFixed(1)} m/s<br>
+                水平速度: ${absHSpeed.toFixed(1)} m/s
+            `;
+        }
+
+        // 重新开始游戏
+        function restartGame() {
+            MOON_GRAVITY = MOON_GRAVITY_CONSTANT;
+            THRUST = START_THRUST;
+            FUEL_RATE = START_FUEL_RATE;
+            horizontalSpeed = START_HORIZONTAL_SPEED;
+            gameRunning = true;
+            engineOn = false;
+            landerAngle = Math.PI + Math.PI / 2;
+            altitude = 5000;
+            horizontalSpeed = 800;
+            verticalSpeed = 0;
+            horizontalDistance = 0; // 重置水平距离
+            fuel = INITIAL_FUEL;
+            mass = DRY_MASS + fuel;
+            terrainOffset = 0;
+            resultMessage.style.display = '';
+            resultTitle.style.display = '';
+            resultPanel.style.display = 'none';
+            engineBtn.classList.remove('active');
+            moonIndicator.style.display = 'flex';
+
+            mountain.x = canvasWidth + 500;
+            mountain.baseWidth = getRandomMountainWidth();
+            mountain.height = getRandomMountainHeight();
+            updateMoonSurface();
+            updateUI();
+        }
+
+        // 游戏主循环
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = (timestamp - lastTime) / 1000; // 转换为秒
+            lastTime = timestamp;
+
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制背景
+            drawStars();
+
+            // 绘制月球表面（在5000米以下）
+            if (altitude <= MOON_VISIBLE_HEIGHT) {
+                drawMoonSurface();
+            }
+
+            // 绘制着陆器
+            drawLander();
+
+            // 更新物理
+            if (gameRunning) {
+                updatePhysics(deltaTime);
+            }
+
+            // 循环
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 事件监听
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+
+            if (e.code === 'Space') {
+                engineOn = true;
+                engineBtn.classList.add('active');
+            } else if (e.code === 'KeyA') {
+                landerAngle -= 0.03;
+            } else if (e.code === 'KeyD') {
+                landerAngle += 0.03;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                engineOn = false;
+                engineBtn.classList.remove('active');
+            }
+        });
+
+        // 触摸控制
+        engineBtn.addEventListener('mousedown', () => {
+            if (gameRunning) {
+                engineOn = true;
+                engineBtn.classList.add('active');
+            }
+        });
+
+        engineBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameRunning) {
+                engineOn = true;
+                engineBtn.classList.add('active');
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            engineOn = false;
+            engineBtn.classList.remove('active');
+        });
+
+        document.addEventListener('touchend', (e) => {
+            engineOn = false;
+            engineBtn.classList.remove('active');
+        });
+
+        leftBtn.addEventListener('mousedown', () => {
+            if (gameRunning) landerAngle -= 0.03;
+        });
+
+        leftBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameRunning) landerAngle -= 0.03;
+        });
+
+        rightBtn.addEventListener('mousedown', () => {
+            if (gameRunning) landerAngle += 0.03;
+        });
+
+        rightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameRunning) landerAngle += 0.03;
+        });
+
+        // 窗口大小变化处理
+        window.addEventListener('resize', () => {
+            initCanvas();
+        });
+
+
+        // 初始化游戏
+        window.onload = function () {
+            initCanvas();
+            updateUI();
+            resultMessage.style.display = 'none';
+            resultTitle.style.display = 'none';
+            resultPanel.style.display = 'block';
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+
+</html>
