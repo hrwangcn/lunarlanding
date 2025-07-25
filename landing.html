@@ -95,15 +95,15 @@
             </div>
 
             <div>
+                <div class="status-panel">
+                    状态: <span id="engineStatus">发动机关闭</span> |
+                    姿态: <span id="landerAngle">270°</span>
+                </div>
+
                 <div class="control-buttons">
                     <button class="control-btn" id="leftBtn">左转 (A)</button>
                     <button class="control-btn engine-btn" id="engineBtn">发动机点火 (空格)</button>
                     <button class="control-btn" id="rightBtn">右转 (D)</button>
-                </div>
-
-                <div class="status-panel">
-                    状态: <span id="engineStatus">发动机关闭</span> |
-                    姿态: <span id="landerAngle">270°</span>
                 </div>
             </div>
         </div>
@@ -657,8 +657,14 @@
             if (!gameRunning) return;
 
             if (e.code === 'Space') {
-                engineOn = true;
-                engineBtn.classList.add('active');
+                if (gameRunning) {
+                    if(engineOn){
+                        engineBtn.classList.remove('active');
+                    } else {
+                        engineBtn.classList.add('active');                    
+                    }
+                    engineOn = !engineOn;
+                }
             } else if (e.code === 'KeyA') {
                 landerAngle -= 0.03;
             } else if (e.code === 'KeyD') {
@@ -684,8 +690,12 @@
         engineBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (gameRunning) {
-                engineOn = true;
-                engineBtn.classList.add('active');
+                if(engineOn){
+                    engineBtn.classList.remove('active');
+                } else {
+                    engineBtn.classList.add('active');                    
+                }
+                engineOn = !engineOn;
             }
         });
 
@@ -693,11 +703,8 @@
             engineOn = false;
             engineBtn.classList.remove('active');
         });
-
-        document.addEventListener('touchend', (e) => {
-            engineOn = false;
-            engineBtn.classList.remove('active');
-        });
+        
+        let pressTimer = null;
 
         leftBtn.addEventListener('mousedown', () => {
             if (gameRunning) landerAngle -= 0.03;
@@ -705,7 +712,10 @@
 
         leftBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (gameRunning) landerAngle -= 0.03;
+            clearInterval(pressTimer);
+            pressTimer = setInterval(function(){
+                if (gameRunning) landerAngle -= 0.03;
+            }, 100)
         });
 
         rightBtn.addEventListener('mousedown', () => {
@@ -714,7 +724,14 @@
 
         rightBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (gameRunning) landerAngle += 0.03;
+            clearInterval(pressTimer);
+            pressTimer = setInterval(function(){
+                if (gameRunning) landerAngle += 0.03;
+            }, 100)
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            clearInterval(pressTimer);
         });
 
         // 窗口大小变化处理
