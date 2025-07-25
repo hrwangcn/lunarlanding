@@ -527,6 +527,7 @@
 
             // 检查是否着陆
             if (altitude <= 0) {
+                engineOn = false;
                 checkLanding();
             }
 
