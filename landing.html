@@ -24,7 +24,7 @@
         </div>
         <div class="result-panel" id="resultPanel">
             <h2 id="resultTitle">任务结果</h2>
-            <p id="resultMessage"></p>
+            <p id="resultMessage">任务目标：安全落月，水平速度和垂直速度均不大于3m/s，尽可能靠近预定着陆点</p>
             <button onclick="restartGame()">开始新任务</button>
         </div>
 
@@ -748,7 +748,7 @@
         window.onload = function () {
             initCanvas();
             updateUI();
-            resultMessage.style.display = 'none';
+            resultMessage.style.display = 'block';
             resultTitle.style.display = 'none';
             resultPanel.style.display = 'block';
             requestAnimationFrame(gameLoop);
