@@ -22,6 +22,9 @@
                 <div class="moon-distance" id="moonDistance">高度: 10000 米</div>
             </div>
         </div>
+        <div class="time-panel" id="timePanel">
+            <p id=timer></p>
+        </div>
         <div class="result-panel" id="resultPanel">
             <h2 id="resultTitle">任务结果</h2>
             <p id="resultMessage">任务目标：安全落月，水平速度和垂直速度均不大于3m/s，尽可能靠近预定着陆点</p>
@@ -189,6 +192,7 @@
         const compassNeedle = document.getElementById('compassNeedle');
         const moonIndicator = document.getElementById('moonIndicator');
         const moonDistance = document.getElementById('moonDistance');
+        const timer = document.getElementById('timer');
 
         // 初始化画布
         function initCanvas() {
@@ -621,6 +625,13 @@
             resultPanel.style.display = 'none';
             engineBtn.classList.remove('active');
             moonIndicator.style.display = 'flex';
+            let time = 1;
+            setInterval(() => {
+                if (gameRunning) {
+                    timer.innerHTML = `${time}s`;
+                    time++;
+                }
+            }, 1000);
 
             mountain.x = canvasWidth + 500;
             mountain.baseWidth = getRandomMountainWidth();

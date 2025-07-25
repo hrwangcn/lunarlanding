@@ -189,6 +189,10 @@ canvas {
     font-size: 24px;
 }
 
+.time-panel {
+    position: absolute;
+}
+
 .result-panel p {
     margin: 8px 0;
     font-size: 14px;
