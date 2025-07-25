@@ -125,7 +125,7 @@
         const MOON_RADIUS = 1737000; // 月球半径 (m)
         const MOON_VISIBLE_HEIGHT = 5000; // 月球表面可见高度
         const HORIZONTAL_SCALE = 0.001; // 水平移动比例系数
-        
+
         const TARGET_START = 80000;    // 目标起始位置 (80km)
         const TARGET_END = 120000;     // 目标结束位置 (120km)
         const TARGET_CENTER = 100000;  // 目标中心位置 (100km)
@@ -144,7 +144,7 @@
         let canvasHeight = 500;
 
         // 游戏状态
-        let gameRunning = true;
+        let gameRunning = false;
         let engineOn = false;
         let landerAngle = Math.PI + Math.PI / 2; // 初始270度（尾部朝前）
         let altitude = 5000;      // 初始高度 (m)
@@ -456,7 +456,7 @@
             ctx.stroke();
 
             // 发动机火焰
-            if (engineOn) {
+            if (engineOn && fuel > 0) {
                 const flameLength = 10 + Math.random() * 7.5;
                 const flameWidth = 4 + Math.random() * 3;
 
@@ -485,6 +485,8 @@
 
             // 计算离心力效应
             const centrifugalAcceleration = (horizontalSpeed * horizontalSpeed) / (MOON_RADIUS + altitude);
+            // Math.sqrt(horizontalSpeed * horizontalSpeed + verticalSpeed * verticalSpeed) / (MOON_RADIUS + altitude)
+
 
             // 重力加速度（考虑离心力）
             const gravityAcceleration = -MOON_GRAVITY + centrifugalAcceleration;
@@ -656,19 +658,32 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // 发动机控制，若开启则关闭，若关闭则开启
+        function toggleEngine() {
+            if (gameRunning && fuel > 0) {
+                if (engineOn) {
+                    engineBtn.classList.remove('active');
+                } else {
+                    engineBtn.classList.add('active');
+                }
+                engineOn = !engineOn;
+            }
+        }
+        let pressTimer = null;
+
+        //俯仰控制
+        function pitchControl(isRight) {
+            let direction = isRight ? 1 : -1;
+            pressTimer = setInterval(function () {
+                if (gameRunning) landerAngle += 0.03 * direction;
+            }, 100);
+        }
+
         // 事件监听
         document.addEventListener('keydown', (e) => {
             if (!gameRunning) return;
-
             if (e.code === 'Space') {
-                if (gameRunning) {
-                    if(engineOn){
-                        engineBtn.classList.remove('active');
-                    } else {
-                        engineBtn.classList.add('active');                    
-                    }
-                    engineOn = !engineOn;
-                }
+                toggleEngine();
             } else if (e.code === 'KeyA') {
                 landerAngle -= 0.03;
             } else if (e.code === 'KeyD') {
@@ -676,64 +691,48 @@
             }
         });
 
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'Space') {
-                engineOn = false;
-                engineBtn.classList.remove('active');
-            }
-        });
-
         // 触摸控制
         engineBtn.addEventListener('mousedown', () => {
-            if (gameRunning) {
-                engineOn = true;
-                engineBtn.classList.add('active');
-            }
+            toggleEngine();
         });
 
         engineBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (gameRunning) {
-                if(engineOn){
-                    engineBtn.classList.remove('active');
-                } else {
-                    engineBtn.classList.add('active');                    
-                }
-                engineOn = !engineOn;
-            }
+            toggleEngine();
         });
 
         document.addEventListener('mouseup', () => {
-            engineOn = false;
-            engineBtn.classList.remove('active');
+            clearInterval(pressTimer);
         });
-        
-        let pressTimer = null;
+
 
         leftBtn.addEventListener('mousedown', () => {
-            if (gameRunning) landerAngle -= 0.03;
+            clearInterval(pressTimer);
+            pitchControl(false);
         });
 
         leftBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             clearInterval(pressTimer);
-            pressTimer = setInterval(function(){
+            pitchControl(false);
+            /*
+            pressTimer = setInterval(function () {
                 if (gameRunning) landerAngle -= 0.03;
             }, 100)
+            */
         });
 
         rightBtn.addEventListener('mousedown', () => {
-            if (gameRunning) landerAngle += 0.03;
+            clearInterval(pressTimer);
+            pitchControl(true);
         });
 
         rightBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             clearInterval(pressTimer);
-            pressTimer = setInterval(function(){
-                if (gameRunning) landerAngle += 0.03;
-            }, 100)
+            pitchControl(true);
         });
-        
+
         document.addEventListener('touchend', (e) => {
             clearInterval(pressTimer);
         });
