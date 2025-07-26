@@ -191,6 +191,9 @@ canvas {
 
 .time-panel {
     position: absolute;
+    white-space: nowrap;
+    left: 0;
+    top: 0;
 }
 
 .result-panel p {
@@ -346,6 +349,11 @@ canvas {
 }
 
 .target-distance {
+    white-space: nowrap; /* 不换行 */
+    position: absolute;
+    top:0;
+    left: 100%;
+    transform: translate(-100%);
     font-size: 12px;
     background-color: rgba(0, 0, 0, 0.7);
     padding: 3px 8px;

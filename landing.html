@@ -23,9 +23,10 @@
                 <div class="moon-arrow"></div>
                 <div class="moon-distance" id="moonDistance">高度: 10000 米</div>
             </div>
-        </div>
-        <div class="time-panel" id="timePanel">
-            <p id=timer></p>
+            <div class="time-panel" id="timePanel">
+                <p id=timer></p>
+            </div>
+            <div class="target-distance" id="targetDistance"></div>
         </div>
         <div class="result-panel" id="resultPanel">
             <h2 id="resultTitle">任务结果</h2>
@@ -212,10 +213,8 @@
 
             const targetIndicator = document.createElement('div');
             targetIndicator.className = 'target-indicator';
-            targetIndicator.innerHTML = `
-                <div class="target-arrow"></div>
-                <div class="target-distance" id="targetDistance"> </div>
-            `;
+
+            targetIndicator.innerHTML = `<div class="target-arrow"></div>`;
             document.querySelector('.game-canvas-container').appendChild(targetIndicator);
 
             // 创建星空背景
