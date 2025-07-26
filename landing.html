@@ -396,7 +396,7 @@
             // 更新目标距离指示器
             distanceToTarget = TARGET_CENTER - horizontalDistance;
             const distanceText = distanceToTarget >= 0 ?
-                `目标: ${(distanceToTarget / 1000).toFixed(1)} km` :
+                `距离目标: ${(distanceToTarget / 1000).toFixed(1)} km` :
                 `已过目标: ${Math.abs(distanceToTarget / 1000).toFixed(1)} km`;
 
             document.getElementById('targetDistance').textContent = distanceText;
