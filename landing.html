@@ -46,16 +46,16 @@
                         <span class="value" id="altitude">10000 米</span>
                     </div>
                     <div class="data-row">
-                        <span class="label">水平速度:</span>
-                        <span class="value" id="hSpeed">800 m/s</span>
-                    </div>
-                    <div class="data-row">
                         <span class="label">垂直速度:</span>
                         <span class="value" id="vSpeed">0 m/s</span>
                     </div>
                     <div class="data-row">
                         <span class="label">水平距离:</span>
                         <span class="value" id="hDistance">0 米</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">水平速度:</span>
+                        <span class="value" id="hSpeed">800 m/s</span>
                     </div>
                     <div class="data-row">
                         <span class="label">燃料:</span>
@@ -67,7 +67,7 @@
                     </div>
                     <div class="data-row">
                         <span class="label">俯仰:</span>
-                        <span class="value" id="landerAngle">270°</span>
+                        <span class="value" id="landerAngle">0°</span>
                     </div>
                     <div class="data-row">
                         <span class="label">发动机状态:</span>
@@ -100,26 +100,28 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="compass">
-                    <div class="compass-inner">
-                        <div class="compass-needle" id="compassNeedle"></div>
-                        <div class="compass-label compass-n">+90</div>
-                        <div class="compass-label compass-s">-90</div>
-                        <div class="compass-label compass-w">180</div>
-                        <div class="compass-label compass-e">0</div>
+                <!--
+                    <div class="compass">
+                        <div class="compass-inner">
+                            <div class="compass-needle" id="compassNeedle"></div>
+                            <div class="compass-label compass-n">+90</div>
+                            <div class="compass-label compass-s">-90</div>
+                            <div class="compass-label compass-w">180</div>
+                            <div class="compass-label compass-e">0</div>
+                        </div>
                     </div>
-                </div>
-            </div>
+                    -->
 
-            <div>
-                <div class="control-buttons">
-                    <button class="control-btn" id="leftBtn">左转 (A)</button>
-                    <button class="control-btn engine-btn" id="engineBtn">发动机点火 (空格)</button>
-                    <button class="control-btn" id="rightBtn">右转 (D)</button>
-                </div>
+        </div>
+
+        <div>
+            <div class="control-buttons">
+                <button class="control-btn" id="leftBtn">左转 (A)</button>
+                <button class="control-btn engine-btn" id="engineBtn">发动机点火 (空格)</button>
+                <button class="control-btn" id="rightBtn">右转 (D)</button>
             </div>
         </div>
+    </div>
     </div>
 
     <script>
@@ -196,7 +198,7 @@
         const resultMessage = document.getElementById('resultMessage');
         const fuelGauge = document.getElementById('fuelGauge');
         const thrustGauge = document.getElementById('thrustGauge');
-        const compassNeedle = document.getElementById('compassNeedle');
+        // const compassNeedle = document.getElementById('compassNeedle');
         const moonIndicator = document.getElementById('moonIndicator');
         const moonDistance = document.getElementById('moonDistance');
         const timer = document.getElementById('timer');
@@ -561,12 +563,12 @@
 
             // 更新状态信息
             const angleDeg = Math.round(landerAngle * 180 / Math.PI);
-            landerAngleDisplay.textContent = angleDeg + '°';
+            landerAngleDisplay.textContent = `${angleDeg-270}°`;
             engineStatus.textContent = engineOn ? '发动机点火中' : '发动机关闭';
 
             // 更新指南针
             const compassAngle = (angleDeg + 90) % 360;
-            compassNeedle.style.transform = `translate(-50%, -50%) rotate(${compassAngle}deg)`;
+            // compassNeedle.style.transform = `translate(-50%, -50%) rotate(${compassAngle}deg)`;
         }
 
         // 检查着陆结果
