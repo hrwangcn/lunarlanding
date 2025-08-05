@@ -611,12 +611,15 @@
             `;
         }
 
+        let interval;
+
         // 重新开始游戏
         function restartGame() {
             MOON_GRAVITY = MOON_GRAVITY_CONSTANT;
             THRUST = START_THRUST;
             FUEL_RATE = START_FUEL_RATE;
             horizontalSpeed = START_HORIZONTAL_SPEED;
+            clearInterval(interval);
             gameRunning = true;
             engineOn = false;
             landerAngle = Math.PI + Math.PI / 2;
@@ -633,7 +636,7 @@
             engineBtn.classList.remove('active');
             moonIndicator.style.display = 'flex';
             let time = 1;
-            setInterval(() => {
+            interval = setInterval(() => {
                 if (gameRunning) {
                     timer.innerHTML = `${time}s`;
                     time++;
